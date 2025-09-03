@@ -1,6 +1,6 @@
 {
     "name": "@ignaraph01/leaflet-gesture-handling",
-    "version": "1.2.8",
+    "version": "1.2.9",
     "description": "Cloned from elmarquis/Leaflet.GestureHandling. Adds a small delay to show the warning overlay on IOS devices when touching with 1 finger",
     "main": "./dist/leaflet-gesture-handling.min.js",
     "files": [

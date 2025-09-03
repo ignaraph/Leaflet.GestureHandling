@@ -340,6 +340,25 @@
     var draggingMap = false;
 
     var GestureHandling = L.Handler.extend({
+        _singleTouchTimer: null,
+        _GRACE_MS: 250,
+
+        _isIOS: function () {
+            const ua = navigator.userAgent || "";
+            const platform = navigator.platform || "";
+            const iPadOS13up = /Macintosh/.test(ua) && "ontouchend" in document;
+            return (/iPad|iPhone|iPod/.test(ua) || /iPad|iPhone|iPod/.test(platform) || iPadOS13up
+            );
+        },
+
+        _showOverlay: function () {
+            L.DomUtil.addClass(this._map._container, "leaflet-gesture-handling-touch-warning");
+        },
+
+        _hideOverlay: function () {
+            L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
+        },
+
         addHooks: function () {
             this._handleTouch = this._handleTouch.bind(this);
 
@@ -473,67 +492,62 @@
         },
 
         _handleTouch: function (e) {
-            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            var touchStartId;
-            //Disregard touch events on the minimap if present
-            var ignoreList = ["leaflet-control-minimap", "leaflet-interactive", "leaflet-popup-content", "leaflet-popup-content-wrapper", "leaflet-popup-close-button", "leaflet-control-zoom-in", "leaflet-control-zoom-out"];
+            var isIOS = this._isIOS();
 
-            var ignoreElement = false;
-            for (var i = 0; i < ignoreList.length; i++) {
-                if (L.DomUtil.hasClass(e.target, ignoreList[i])) {
-                    ignoreElement = true;
-                }
-            }
-
-            if (ignoreElement) {
-                if (isIOS) {
-                    if (L.DomUtil.hasClass(e.target, "leaflet-interactive") && e.type === "touchmove" && e.touches.length === 1) {
-                        touchStartId = setTimeout(() => {
-                            L.DomUtil.addClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                        }, 200);
-
-                        this._disableInteractions();
-                    } else {
-                        clearTimeout(touchStartId);
-                        L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                    }
-                } else {
-                    if (L.DomUtil.hasClass(e.target, "leaflet-interactive") && e.type === "touchmove" && e.touches.length === 1) {
-                        L.DomUtil.addClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                        this._disableInteractions();
-                    } else {
-                        L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                    }
-                }
+            if (e.type !== "touchstart" && e.type !== "touchmove" && e.type !== "touchend" && e.type !== "touchcancel") {
                 return;
             }
-            // screenLog(e.type+' '+e.touches.length);
-            if (e.type !== "touchmove" && e.type !== "touchstart") {
-                L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                return;
-            }
+
+            var touches = e.touches ? e.touches.length : 0;
 
             if (isIOS) {
-                if (e.touches.length === 1) {
-                    touchStartId = setTimeout(() => {
-                        L.DomUtil.addClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                    }, 200);
-                    this._disableInteractions();
-                } else {
-                    e.preventDefault();
-                    clearTimeout(touchStartId);
+                if (touches >= 2) {
+                    if (this._singleTouchTimer) {
+                        clearTimeout(this._singleTouchTimer);
+                        this._singleTouchTimer = null;
+                    }
+                    this._hideOverlay();
                     this._enableInteractions();
-                    L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
+                    return;
                 }
+
+                if (touches === 1) {
+                    if (e.type === "touchstart") {
+                        if (!this._singleTouchTimer) {
+                            this._singleTouchTimer = setTimeout(() => {
+                                this._showOverlay();
+                                this._disableInteractions();
+                                this._singleTouchTimer = null;
+                            }, this._GRACE_MS);
+                        }
+                    }
+
+                    return;
+                }
+
+                if (touches === 0 || e.type === "touchend" || e.type === "touchcancel") {
+                    if (this._singleTouchTimer) {
+                        clearTimeout(this._singleTouchTimer);
+                        this._singleTouchTimer = null;
+                    }
+                    this._hideOverlay();
+                    this._disableInteractions();
+                    return;
+                }
+
+                return;
+            }
+
+            if (e.type !== "touchmove" && e.type !== "touchstart") {
+                this._hideOverlay();
+                return;
+            }
+            if (touches === 1) {
+                this._showOverlay();
+                this._disableInteractions();
             } else {
-                if (e.touches.length === 1) {
-                    L.DomUtil.addClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                    this._disableInteractions();
-                } else {
-                    e.preventDefault();
-                    this._enableInteractions();
-                    L.DomUtil.removeClass(this._map._container, "leaflet-gesture-handling-touch-warning");
-                }
+                this._enableInteractions();
+                this._hideOverlay();
             }
         },
 
@@ -570,7 +584,6 @@
                 this._disableInteractions();
             }
         }
-
     });
 
     L.Map.addInitHook("addHandler", "gestureHandling", GestureHandling);
