@@ -341,7 +341,7 @@
 
     var GestureHandling = L.Handler.extend({
         _singleTouchTimer: null,
-        _GRACE_MS: 250,
+        _GRACE_MS: 150,
 
         _isIOS: function () {
             const ua = navigator.userAgent || "";
