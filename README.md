@@ -1,6 +1,6 @@
 # Leaflet.GestureHandling
 
-v1.2.6
+v1.2.8
 
 ## About this fork
 This package is a fork of [elmarquis/Leaflet.GestureHandling](https://github.com/elmarquis/Leaflet.GestureHandling) v1.2.2.
